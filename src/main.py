@@ -44,7 +44,7 @@ app.add_middleware(
 )
 
 # Importar y configurar routers después de crear la app para evitar imports circulares
-from .routers import sellers_router, shopkeepers_router, assignments_router
+from .routers import sellers_router, shopkeepers_router, assignments_router, routes_router
 
 # Incluir routers
 app.include_router(
