@@ -24,6 +24,13 @@ from .assignment import (
     HealthResponse
 )
 
+from .route_schemas import (
+    RoutePoint,
+    RouteStatistics,
+    OptimizedRouteResponse,
+    RouteVisualizationRequest
+)
+
 __all__ = [
     # Seller
     "SellerCreate",
@@ -44,5 +51,11 @@ __all__ = [
     "AssignmentDetailResponse",
     "AssignmentHistoryResponse",
     "HealthResponse"
+    # Route
+    "RoutePoint",
+    "RouteStatistics",
+    "OptimizedRouteResponse",
+    "RouteVisualizationRequest"
 ]
+
 
