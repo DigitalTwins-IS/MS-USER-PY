@@ -5,6 +5,7 @@ from .database import Base, get_db, engine
 from .seller import Seller
 from .shopkeeper import Shopkeeper
 from .assignment import Assignment
+from .inventory import ShopkeeperInventory
 
 __all__ = [
     "Base",
@@ -12,6 +13,6 @@ __all__ = [
     "engine",
     "Seller",
     "Shopkeeper",
-    "Assignment"
+    "Assignment",
+    "ShopkeeperInventory"
 ]
-

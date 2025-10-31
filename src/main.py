@@ -42,7 +42,11 @@ app.add_middleware(
 )
 
 # Importar y configurar routers después de crear la app para evitar imports circulares
-from .routers import sellers_router, shopkeepers_router, assignments_router
+from .routers import (
+    sellers_router,
+    shopkeepers_router,
+    assignments_router
+)
 
 # Incluir routers
 app.include_router(
@@ -50,6 +54,7 @@ app.include_router(
     prefix=settings.API_PREFIX,
     tags=["sellers"]
 )
+# ROUTERS DE USUARIOS
 
 app.include_router(
     shopkeepers_router,
@@ -79,21 +84,69 @@ async def root_health():
         "version": settings.APP_VERSION
     }
 
+@app.get("/test-inventory/{shopkeeper_id}/summary", tags=["Test"])
+async def test_inventory_summary(shopkeeper_id: int):
+    """Endpoint de prueba para inventario sin autenticación"""
+    return {
+        "shopkeeper_id": shopkeeper_id,
+        "shopkeeper_name": f"Tendero {shopkeeper_id}",
+        "total_products": 5,
+        "low_stock_items": 2,
+        "total_value": 150000.0,
+        "last_updated": "2024-01-15T10:30:00Z"
+    }
+
+@app.get("/test-inventory/{shopkeeper_id}", tags=["Test"])
+async def test_inventory(shopkeeper_id: int):
+    """Endpoint de prueba para inventario sin autenticación"""
+    return [
+        {
+            "id": 1,
+            "shopkeeper_id": shopkeeper_id,
+            "shopkeeper_name": f"Tendero {shopkeeper_id}",
+            "business_name": f"Tienda {shopkeeper_id}",
+            "product_id": 1,
+            "product_name": "Manzana Roja",
+            "category": "FRUTAS Y VEGETALES",
+            "price": 2500.0,
+            "stock": 50.0,
+            "min_stock": 20.0,
+            "max_stock": 100.0,
+            "stock_status": "normal",
+            "last_updated": "2024-01-15T10:30:00Z"
+        },
+        {
+            "id": 2,
+            "shopkeeper_id": shopkeeper_id,
+            "shopkeeper_name": f"Tendero {shopkeeper_id}",
+            "business_name": f"Tienda {shopkeeper_id}",
+            "product_id": 2,
+            "product_name": "Arroz Integral",
+            "category": "GRANOS",
+            "price": 3200.0,
+            "stock": 5.0,
+            "min_stock": 10.0,
+            "max_stock": 80.0,
+            "stock_status": "low",
+            "last_updated": "2024-01-15T10:30:00Z"
+        }
+    ]
+
 
 # Event handlers
 @app.on_event("startup")
 async def startup_event():
     """Evento de inicio de la aplicación"""
-    print(f"🚀 {settings.APP_NAME} v{settings.APP_VERSION} iniciado")
-    print(f"📚 Documentación disponible en: http://{settings.SERVICE_HOST}:{settings.SERVICE_PORT}/docs")
-    print(f"👥 Endpoints de usuarios en: {settings.API_PREFIX}")
-    print(f"🔗 Integraciones: MS-GEO ({settings.MS_GEO_URL})")
+    print(f"[STARTUP] {settings.APP_NAME} v{settings.APP_VERSION} iniciado")
+    print(f"[INFO] Documentación disponible en: http://{settings.SERVICE_HOST}:{settings.SERVICE_PORT}/docs")
+    print(f"[INFO] Endpoints de usuarios en: {settings.API_PREFIX}")
+    print(f"[INFO] Integraciones: MS-GEO ({settings.MS_GEO_URL})")
 
 
 @app.on_event("shutdown")
 async def shutdown_event():
     """Evento de cierre de la aplicación"""
-    print(f"🛑 {settings.APP_NAME} detenido")
+    print(f"[SHUTDOWN] {settings.APP_NAME} detenido")
 
 
 if __name__ == "__main__":
