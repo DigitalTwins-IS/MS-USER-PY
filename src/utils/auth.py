@@ -34,11 +34,16 @@ def decode_token(token: str) -> dict:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         email: str = payload.get("sub")
         role: str = payload.get("role")
+        user_id: int = payload.get("user_id")
         
         if email is None:
             raise credentials_exception
             
-        return {"email": email, "role": role}
+        return {
+            "email": email, 
+            "role": role,
+            "user_id": user_id
+        }
         
     except JWTError:
         raise credentials_exception

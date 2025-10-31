@@ -23,6 +23,19 @@ from .assignment import (
     AssignmentHistoryResponse,
     HealthResponse
 )
+from .product import (
+    ProductCreate,
+    ProductUpdate,
+    ProductResponse
+)
+from .inventory import (
+    InventoryCreate,
+    InventoryUpdate,
+    InventoryResponse,
+    InventoryDetailResponse,
+    StockAdjustment,
+    InventorySummary
+)
 
 from .route_schemas import (
     RoutePoint,
@@ -50,12 +63,22 @@ __all__ = [
     "AssignmentResponse",
     "AssignmentDetailResponse",
     "AssignmentHistoryResponse",
-    "HealthResponse"
+    "HealthResponse",
+    # Product
+    "ProductCreate",
+    "ProductUpdate",
+    "ProductResponse",
+    # Inventory
+    "InventoryCreate",
+    "InventoryUpdate",
+    "InventoryResponse",
+    "InventoryDetailResponse",
+    "StockAdjustment",
+    "InventorySummary",
+    "HealthResponse",
     # Route
     "RoutePoint",
     "RouteStatistics",
     "OptimizedRouteResponse",
     "RouteVisualizationRequest"
 ]
-
-
