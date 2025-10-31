@@ -5,6 +5,8 @@ FastAPI Application
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
+from .routers import routes_router
+
 
 from .config import settings
 
@@ -45,7 +47,8 @@ app.add_middleware(
 from .routers import (
     sellers_router,
     shopkeepers_router,
-    assignments_router
+    assignments_router,
+    routes_router
 )
 
 # Incluir routers
@@ -66,6 +69,12 @@ app.include_router(
     assignments_router,
     prefix=settings.API_PREFIX,
     tags=["assignments"]
+)
+
+app.include_router(
+    routes_router,
+    prefix=settings.API_PREFIX,
+    tags=["routes"]
 )
 
 

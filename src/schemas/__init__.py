@@ -37,6 +37,13 @@ from .inventory import (
     InventorySummary
 )
 
+from .route_schemas import (
+    RoutePoint,
+    RouteStatistics,
+    OptimizedRouteResponse,
+    RouteVisualizationRequest
+)
+
 __all__ = [
     # Seller
     "SellerCreate",
@@ -67,5 +74,11 @@ __all__ = [
     "InventoryResponse",
     "InventoryDetailResponse",
     "StockAdjustment",
-    "InventorySummary"
+    "InventorySummary",
+    "HealthResponse",
+    # Route
+    "RoutePoint",
+    "RouteStatistics",
+    "OptimizedRouteResponse",
+    "RouteVisualizationRequest"
 ]
