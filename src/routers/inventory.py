@@ -10,6 +10,7 @@ from sqlalchemy import text, func
 from typing import List, Optional
 from decimal import Decimal
 import httpx
+import logging
 
 from ..models import get_db, ShopkeeperInventory, Shopkeeper
 from ..schemas.inventory import (
@@ -19,6 +20,7 @@ from ..schemas.inventory import (
 from ..utils import get_current_user
 from ..clients.product_client import product_client
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -189,48 +191,121 @@ async def get_shopkeeper_inventory(
     if not shopkeeper:
         raise HTTPException(404, "Tendero no encontrado")
     
-    # Obtener items del inventario usando el nuevo esquema
-    query = db.query(ShopkeeperInventory).filter(
-        ShopkeeperInventory.shopkeeper_id == shopkeeper_id,
-        ShopkeeperInventory.is_active == True
-    )
+    # Obtener items del inventario con JOIN a la tabla products para obtener nombre y categoría
+    # Usar SQL directo para hacer JOIN con la tabla products
+    query_sql = text("""
+        SELECT 
+            i.id,
+            i.shopkeeper_id,
+            i.product_id,
+            i.unit_price,
+            i.current_stock,
+            i.min_stock,
+            i.max_stock,
+            i.last_updated,
+            COALESCE(i.product_name, p.name) as product_name,
+            COALESCE(i.product_category, p.category) as product_category
+        FROM inventories i
+        LEFT JOIN products p ON i.product_id = p.id
+        WHERE i.shopkeeper_id = :shopkeeper_id 
+        AND i.is_active = TRUE
+    """)
     
     if low_stock_only:
-        query = query.filter(ShopkeeperInventory.current_stock < ShopkeeperInventory.min_stock)
+        query_sql = text("""
+            SELECT 
+                i.id,
+                i.shopkeeper_id,
+                i.product_id,
+                i.unit_price,
+                i.current_stock,
+                i.min_stock,
+                i.max_stock,
+                i.last_updated,
+                COALESCE(i.product_name, p.name) as product_name,
+                COALESCE(i.product_category, p.category) as product_category
+            FROM inventories i
+            LEFT JOIN products p ON i.product_id = p.id
+            WHERE i.shopkeeper_id = :shopkeeper_id 
+            AND i.is_active = TRUE
+            AND i.current_stock < i.min_stock
+        """)
     
-    inventory_items = query.all()
+    result = db.execute(query_sql, {"shopkeeper_id": shopkeeper_id})
+    rows = result.fetchall()
+    
     inventory = []
     
-    for item in inventory_items:
-        # Obtener información actualizada del producto desde el microservicio
-        product_info = await product_client.get_product(item.product_id)
-        
+    for row in rows:
         # Determinar estado del stock
-        if item.current_stock < item.min_stock:
+        if row.current_stock < row.min_stock:
             stock_status = 'low'
-        elif item.current_stock > item.max_stock:
+        elif row.current_stock > row.max_stock:
             stock_status = 'high'
         else:
             stock_status = 'normal'
         
-        # Usar información del microservicio de Product si está disponible, sino usar la local
-        product_name = product_info.get("name") if product_info else item.product_name or f"Producto {item.product_id}"
-        product_category = product_info.get("category") if product_info else item.product_category or "Sin categoría"
+        # Intentar obtener información actualizada del producto desde el microservicio
+        # Priorizar siempre el nombre del microservicio si está disponible
+        product_name = row.product_name or f"Producto {row.product_id}"
+        product_category = row.product_category or "Sin categoría"
+        needs_update = False
+        
+        try:
+            product = await product_client.get_product(row.product_id)
+            if product:
+                # Priorizar el nombre del microservicio sobre el almacenado
+                new_product_name = product.get("name")
+                new_product_category = product.get("category")
+                
+                logger.info(f"Producto {row.product_id} obtenido del microservicio: nombre={new_product_name}, categoría={new_product_category}")
+                
+                if new_product_name:
+                    product_name = new_product_name
+                    # Si el nombre cambió, actualizar en la BD
+                    if row.product_name != new_product_name:
+                        logger.info(f"Actualizando nombre del producto {row.product_id} de '{row.product_name}' a '{new_product_name}'")
+                        needs_update = True
+                else:
+                    logger.warning(f"Producto {row.product_id} obtenido del microservicio pero sin nombre")
+                
+                if new_product_category:
+                    product_category = new_product_category
+                    # Si la categoría cambió, actualizar en la BD
+                    if row.product_category != new_product_category:
+                        needs_update = True
+            else:
+                logger.warning(f"Producto {row.product_id} no encontrado en el microservicio, usando nombre almacenado: '{row.product_name}'")
+        except Exception as e:
+            # Si falla, usar los datos almacenados en la BD
+            logger.warning(f"No se pudo obtener producto {row.product_id} del microservicio: {e}")
+        
+        # Actualizar el nombre en la BD si cambió
+        if needs_update:
+            try:
+                inventory_item = db.query(ShopkeeperInventory).filter(ShopkeeperInventory.id == row.id).first()
+                if inventory_item:
+                    inventory_item.product_name = product_name
+                    inventory_item.product_category = product_category
+                    db.commit()
+            except Exception as e:
+                logger.warning(f"Error al actualizar nombre del producto {row.product_id} en BD: {e}")
+                db.rollback()
         
         inventory.append(InventoryDetailResponse(
-            id=item.id,
-            shopkeeper_id=item.shopkeeper_id,
+            id=row.id,
+            shopkeeper_id=row.shopkeeper_id,
             shopkeeper_name=shopkeeper.name,
             business_name=shopkeeper.business_name,
-            product_id=item.product_id,
+            product_id=row.product_id,
             product_name=product_name,
             category=product_category,
-            price=float(item.unit_price),
-            stock=float(item.current_stock),
-            min_stock=float(item.min_stock),
-            max_stock=float(item.max_stock),
+            price=float(row.unit_price),
+            stock=float(row.current_stock),
+            min_stock=float(row.min_stock),
+            max_stock=float(row.max_stock),
             stock_status=stock_status,
-            last_updated=item.last_updated
+            last_updated=row.last_updated
         ))
     
     return inventory
@@ -294,7 +369,7 @@ async def add_inventory_item(
     Agregar un producto al inventario de un tendero
     
     **Nota**: Un tendero no puede tener el mismo producto duplicado.
-    El producto debe existir en el microservicio de Product.
+    Si el microservicio de Product no está disponible, se usan los datos proporcionados.
     """
     # Verificar que el tendero existe
     shopkeeper = db.query(Shopkeeper).filter(
@@ -307,13 +382,32 @@ async def add_inventory_item(
     if inventory_data.product_id <= 0:
         raise HTTPException(400, f"ID de producto '{inventory_data.product_id}' no es válido")
     
-    # Validar que el producto existe en el microservicio de Product
-    product = await product_client.get_product(inventory_data.product_id)
-    if not product:
-        raise HTTPException(
-            404, 
-            f"El producto con ID '{inventory_data.product_id}' no existe en el catálogo de productos"
-        )
+    # Intentar obtener información del producto desde el microservicio
+    # Si no está disponible, usar los datos proporcionados en el request
+    product = None
+    product_name = None
+    product_description = None
+    product_category = None
+    
+    try:
+        product = await product_client.get_product(inventory_data.product_id)
+        if product:
+            logger.info(f"Producto {inventory_data.product_id} obtenido del microservicio: {product}")
+            product_name = product.get("name")
+            product_description = product.get("description")
+            product_category = product.get("category")
+        else:
+            logger.warning(f"Producto {inventory_data.product_id} no encontrado en el microservicio")
+    except Exception as e:
+        logger.warning(f"No se pudo obtener producto {inventory_data.product_id} del microservicio: {e}")
+        # Continuar con los datos proporcionados en el request
+    
+    # Determinar el nombre del producto: priorizar microservicio, luego datos del request, luego fallback
+    final_product_name = product_name or inventory_data.product_name or f"Producto {inventory_data.product_id}"
+    final_product_description = product_description or inventory_data.product_description
+    final_product_category = product_category or inventory_data.product_category
+    
+    logger.info(f"Creando inventario para producto {inventory_data.product_id} con nombre: '{final_product_name}'")
     
     # Verificar que no existe ya este producto en el inventario
     existing = db.query(ShopkeeperInventory).filter(
@@ -327,17 +421,25 @@ async def add_inventory_item(
             f"El producto con ID '{inventory_data.product_id}' ya existe en el inventario de este tendero"
         )
     
-    # Crear nuevo item en el inventario usando la información del microservicio de Product
+    # Asegurar que el stock sea un entero
+    current_stock = int(round(float(inventory_data.current_stock or 0)))
+    min_stock = int(round(float(inventory_data.min_stock or 10)))
+    max_stock = int(round(float(inventory_data.max_stock or 100)))
+    
+    logger.info(f"Guardando stock: current_stock={current_stock}, min_stock={min_stock}, max_stock={max_stock}")
+    
+    # Crear nuevo item en el inventario usando la información del microservicio si está disponible,
+    # sino usar los datos proporcionados en el request
     new_item = ShopkeeperInventory(
         shopkeeper_id=inventory_data.shopkeeper_id,
         product_id=inventory_data.product_id,
-        unit_price=inventory_data.unit_price,
-        current_stock=inventory_data.current_stock,
-        min_stock=inventory_data.min_stock,
-        max_stock=inventory_data.max_stock,
-        product_name=inventory_data.product_name or product.get("name"),
-        product_description=inventory_data.product_description or product.get("description"),
-        product_category=inventory_data.product_category or product.get("category"),
+        unit_price=Decimal(str(inventory_data.unit_price)),
+        current_stock=Decimal(str(current_stock)),
+        min_stock=Decimal(str(min_stock)),
+        max_stock=Decimal(str(max_stock)),
+        product_name=final_product_name,
+        product_description=final_product_description,
+        product_category=final_product_category,
         product_brand=inventory_data.product_brand,
         is_validated=True,
         validated_by=current_user.get("user_id"),
@@ -373,9 +475,30 @@ async def update_inventory_item(
     if not item:
         raise HTTPException(404, "Item de inventario no encontrado")
     
-    # Actualizar campos
+    # Intentar obtener información actualizada del producto desde el microservicio
+    try:
+        product = await product_client.get_product(item.product_id)
+        if product:
+            # Actualizar nombre y categoría si están disponibles en el microservicio
+            if product.get("name"):
+                item.product_name = product.get("name")
+            if product.get("category"):
+                item.product_category = product.get("category")
+            if product.get("description"):
+                item.product_description = product.get("description")
+    except Exception as e:
+        logger.warning(f"No se pudo obtener producto {item.product_id} del microservicio al actualizar: {e}")
+    
+    # Actualizar campos del request (asegurando que el stock sea entero)
     for field, value in inventory_data.model_dump(exclude_unset=True).items():
-        setattr(item, field, value)
+        if field == "current_stock" and value is not None:
+            # Asegurar que el stock sea un entero
+            setattr(item, field, Decimal(str(int(round(float(value))))))
+        elif field in ["min_stock", "max_stock"] and value is not None:
+            # Asegurar que min/max sean enteros
+            setattr(item, field, Decimal(str(int(round(float(value))))))
+        else:
+            setattr(item, field, value)
     
     db.commit()
     db.refresh(item)
@@ -443,17 +566,23 @@ async def adjust_stock(
             "Este producto no existe en el inventario. Primero debe agregarlo."
         )
     
-    # Calcular nuevo stock
-    new_stock = float(item.stock) + adjustment.quantity
+    # Asegurar que la cantidad de ajuste sea un entero
+    adjustment_quantity = int(round(float(adjustment.quantity or 0)))
+    
+    # Calcular nuevo stock (asegurando que sea entero)
+    current_stock = int(round(float(item.current_stock or 0)))
+    new_stock = current_stock + adjustment_quantity
+    
+    logger.info(f"Ajustando stock del producto {adjustment.product_id}: {current_stock} + {adjustment_quantity} = {new_stock}")
     
     # Validar que no quede negativo
     if new_stock < 0:
         raise HTTPException(
             400, 
-            f"Stock insuficiente. Stock actual: {item.stock}, intentando reducir: {abs(adjustment.quantity)}"
+            f"Stock insuficiente. Stock actual: {current_stock}, intentando reducir: {abs(adjustment_quantity)}"
         )
     
-    # Actualizar stock
+    # Actualizar stock (asegurando que sea entero)
     item.current_stock = Decimal(str(new_stock))
     db.commit()
     db.refresh(item)

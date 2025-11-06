@@ -48,7 +48,8 @@ from .routers import (
     sellers_router,
     shopkeepers_router,
     assignments_router,
-    routes_router
+    routes_router,
+    inventory_router
 )
 
 # Incluir routers
@@ -75,6 +76,12 @@ app.include_router(
     routes_router,
     prefix=settings.API_PREFIX,
     tags=["routes"]
+)
+
+app.include_router(
+    inventory_router,
+    prefix=settings.API_PREFIX,
+    tags=["inventory"]
 )
 
 
