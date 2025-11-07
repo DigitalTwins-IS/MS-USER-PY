@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     # External Services
     MS_GEO_URL: str = "http://ms-geo-py:8000"
     MS_AUTH_URL: str = "http://ms-auth-py:8000"
+    MS_PRODUCT_URL: str = "http://ms-product-py:8000"
     
     # Business Rules
     MAX_SHOPKEEPERS_PER_SELLER: int = 80

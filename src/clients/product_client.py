@@ -5,15 +5,16 @@ import httpx
 from typing import Optional, Dict, Any
 from fastapi import HTTPException
 import logging
+from ..config import settings
 
 logger = logging.getLogger(__name__)
 
 class ProductClient:
     """Cliente para comunicarse con el microservicio de Product"""
     
-    def __init__(self, base_url: str = "http://localhost:8005"):
-        self.base_url = base_url.rstrip('/')
-        self.timeout = 30.0
+    def __init__(self, base_url: Optional[str] = None):
+        self.base_url = (base_url or settings.MS_PRODUCT_URL).rstrip('/')
+        self.timeout = 5.0  # Timeout más corto para no bloquear
     
     async def get_product(self, product_id: int) -> Optional[Dict[str, Any]]:
         """
@@ -23,38 +24,38 @@ class ProductClient:
             product_id: ID del producto a consultar
             
         Returns:
-            Dict con la información del producto o None si no existe
-            
-        Raises:
-            HTTPException: Si hay error en la comunicación
+            Dict con la información del producto o None si no existe o hay error
+            (No lanza excepción para permitir fallback a datos locales)
         """
+        url = f"{self.base_url}/api/v1/products/{product_id}"
+        logger.info(f"Consultando producto {product_id} desde: {url}")
+        
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
-                response = await client.get(f"{self.base_url}/api/v1/products/products/{product_id}")
+                response = await client.get(url)
+                
+                logger.info(f"Respuesta del microservicio para producto {product_id}: status={response.status_code}")
                 
                 if response.status_code == 404:
+                    logger.warning(f"Producto {product_id} no encontrado en el microservicio (404)")
                     return None
                 elif response.status_code == 200:
-                    return response.json()
+                    product_data = response.json()
+                    logger.info(f"Producto {product_id} obtenido: {product_data}")
+                    return product_data
                 else:
-                    logger.error(f"Error al obtener producto {product_id}: {response.status_code} - {response.text}")
-                    raise HTTPException(
-                        status_code=502,
-                        detail=f"Error al consultar el producto en el microservicio de Product: {response.status_code}"
-                    )
+                    logger.warning(f"Error al obtener producto {product_id}: {response.status_code} - {response.text}")
+                    return None
                     
         except httpx.TimeoutException:
-            logger.error(f"Timeout al consultar producto {product_id}")
-            raise HTTPException(
-                status_code=504,
-                detail="Timeout al consultar el microservicio de Product"
-            )
+            logger.warning(f"Timeout al consultar producto {product_id} desde {url} - usando datos locales")
+            return None
         except httpx.RequestError as e:
-            logger.error(f"Error de conexión al consultar producto {product_id}: {str(e)}")
-            raise HTTPException(
-                status_code=503,
-                detail="Error de conexión con el microservicio de Product"
-            )
+            logger.warning(f"Error de conexión al consultar producto {product_id} desde {url}: {str(e)} - usando datos locales")
+            return None
+        except Exception as e:
+            logger.error(f"Error inesperado al consultar producto {product_id}: {str(e)}")
+            return None
     
     async def validate_product_exists(self, product_id: int) -> bool:
         """
@@ -82,7 +83,7 @@ class ProductClient:
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
                 response = await client.get(
-                    f"{self.base_url}/api/v1/products/products",
+                    f"{self.base_url}/api/v1/products/",
                     params={"category": category}
                 )
                 
