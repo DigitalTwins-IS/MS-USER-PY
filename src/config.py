@@ -40,6 +40,20 @@ class Settings(BaseSettings):
     MAX_SHOPKEEPERS_PER_SELLER: int = 80
     MAX_SELLERS_PER_ZONE: int = 10  # Recomendado, no hard limit
     
+    OPENROUTE_API_KEY: str = ""
+    OPENROUTE_ENABLED: bool = False
+    
+    # Nominatim (Geocoding)
+    NOMINATIM_ENABLED: bool = True
+    NOMINATIM_USER_AGENT: str = "DigitalTwins-IS/1.0"
+    
+    # Route Cache
+    ROUTE_CACHE_TTL_HOURS: int = 24
+    ROUTE_CACHE_MAX_SIZE: int = 1000
+    
+    # Fallback behavior
+    USE_HAVERSINE_FALLBACK: bool = True
+    
     class Config:
         env_file = ".env"
         case_sensitive = True

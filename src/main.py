@@ -45,6 +45,35 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.CORS_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],)
+
+from .clients import init_openroute_client
+
+@app.on_event("startup")
+async def startup_event():
+    """Evento de inicio de la aplicación"""
+    print(f" {settings.APP_NAME} v{settings.APP_VERSION} iniciado")
+    # Inicializar OpenRouteService
+    if settings.OPENROUTE_ENABLED and settings.OPENROUTE_API_KEY:
+        init_openroute_client(settings.OPENROUTE_API_KEY)
+        print("OpenRouteService inicializado")
+    else:
+        print("  OpenRouteService no configurado (usando Haversine)")
+    # Nominatim siempre disponible
+    if settings.NOMINATIM_ENABLED:
+        print("Nominatim habilitado")
+    print(f" Documentación: http://{settings.SERVICE_HOST}:{settings.SERVICE_PORT}/docs")
+
+# Incluir routers
+app.include_router(
+    sellers_router,
+    prefix=settings.API_PREFIX,
+    tags=["sellers"])
 # Importar y configurar routers después de crear la app para evitar imports circulares
 from .routers import (
     sellers_router,
