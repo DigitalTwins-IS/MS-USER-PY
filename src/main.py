@@ -22,12 +22,14 @@ app = FastAPI(
     * **Vendedores (Sellers)**: Registro, actualización, asignación a zonas
     * **Tenderos (Shopkeepers)**: Registro con geolocalización, gestión de coordenadas
     * **Asignaciones (Assignments)**: Asignar tenderos a vendedores, historial completo
+    * **Visitas (Visits)**: Agendar visitas basadas en inventario (HU21)
     
     ## Historias de Usuario Implementadas
     
     * **HU2**: Como administrador, quiero registrar vendedores y asignarlos a zonas
     * **HU3**: Como administrador, quiero registrar tenderos con latitud/longitud
     * **HU4**: Como administrador, quiero actualizar datos de vendedores y tenderos
+    * **HU21**: Como vendedor, quiero agendar visitas basadas en inventario
     """,
     docs_url="/docs",
     redoc_url="/redoc",
@@ -49,7 +51,8 @@ from .routers import (
     shopkeepers_router,
     assignments_router,
     routes_router,
-    inventory_router
+    inventory_router,
+    visits_router
 )
 
 # Incluir routers
@@ -82,6 +85,12 @@ app.include_router(
     inventory_router,
     prefix=settings.API_PREFIX,
     tags=["inventory"]
+)
+
+app.include_router(
+    visits_router,
+    prefix=settings.API_PREFIX,
+    tags=["visits"]
 )
 
 

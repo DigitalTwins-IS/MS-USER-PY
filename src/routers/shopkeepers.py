@@ -38,7 +38,8 @@ async def create_shopkeeper(
 async def list_shopkeepers(
     is_active: Optional[bool] = Query(True),
     seller_id: Optional[int] = Query(None),
-    unassigned: Optional[bool] = Query(False),
+    unassigned: Optional[bool] = Query(None, description="Filtrar por tenderos sin asignar"),
+    assigned: Optional[bool] = Query(None, description="Filtrar por tenderos con vendedor asignado"),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=100),
     db: Session = Depends(get_db),
@@ -75,8 +76,18 @@ async def list_shopkeepers(
             continue
         
         # Filtrar no asignados si se especifica
-        if unassigned and assignment:
-            continue
+        if unassigned is not None:
+            if unassigned and assignment:
+                continue
+            if not unassigned and not assignment:
+                continue
+        
+        # Filtrar asignados si se especifica
+        if assigned is not None:
+            if assigned and not assignment:
+                continue
+            if not assigned and assignment:
+                continue
         
         result.append(ShopkeeperWithSellerResponse(**shopkeeper_dict))
     

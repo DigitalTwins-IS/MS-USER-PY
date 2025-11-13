@@ -17,7 +17,7 @@ class SellerBase(BaseModel):
 
 class SellerCreate(SellerBase):
     """Schema para crear vendedor"""
-    user_id: Optional[int] = Field(None, description="ID del usuario del sistema (opcional)")
+    user_id: Optional[int] = Field(None, description="ID del usuario del sistema (opcional, si no se proporciona se crea automáticamente)")
     
     class Config:
         json_schema_extra = {
@@ -26,8 +26,7 @@ class SellerCreate(SellerBase):
                 "email": "juan.perez@vendedor.com",
                 "phone": "3001234567",
                 "address": "Calle 80 #12-34, Bogotá",
-                "zone_id": 1,
-                "user_id": 1
+                "zone_id": 1
             }
         }
 

@@ -11,7 +11,7 @@ from ..schemas import (
     SellerCreate, SellerUpdate, SellerResponse,
     SellerWithShopkeepersResponse, ChangeZoneRequest, HealthResponse
 )
-from ..utils import get_current_user, geo_client
+from ..utils import get_current_user, geo_client, auth_client
 
 router = APIRouter()
 
@@ -22,15 +22,48 @@ async def create_seller(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
-    """HU2: Crear vendedor y asignarlo a zona"""
+    """
+    HU2: Crear vendedor y asignarlo a zona
+    Automáticamente crea un usuario con rol VENDEDOR en MS-AUTH-PY para que pueda hacer login
+    """
     # Verificar zona existe
     await geo_client.verify_zone_exists(seller_data.zone_id)
     
-    # Verificar email único
+    # Verificar email único en sellers
     if db.query(Seller).filter(Seller.email == seller_data.email).first():
-        raise HTTPException(400, "El email ya está registrado")
+        raise HTTPException(400, "El email ya está registrado como vendedor")
     
-    new_seller = Seller(**seller_data.model_dump())
+    # Crear usuario automáticamente en MS-AUTH-PY (requerido para que el vendedor pueda hacer login)
+    user_id = seller_data.user_id
+    if not user_id:
+        # Generar contraseña temporal (el usuario deberá cambiarla en el primer login)
+        # Por defecto: "Vendedor123!" (debe cumplir con políticas de seguridad)
+        default_password = "Vendedor123!"
+        
+        # Crear usuario en MS-AUTH-PY
+        user_data = await auth_client.create_user(
+            name=seller_data.name,
+            email=seller_data.email,
+            password=default_password,
+            role="VENDEDOR"
+        )
+        
+        if user_data and "id" in user_data:
+            user_id = user_data["id"]
+        else:
+            # Si falla la creación del usuario, retornar error
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="No se pudo crear el usuario en el sistema de autenticación. "
+                       "Verifique que el email no esté registrado en el sistema de usuarios."
+            )
+    
+    # Crear el seller con el user_id
+    seller_dict = seller_data.model_dump()
+    seller_dict["user_id"] = user_id
+    # Eliminar create_user del dict (no se guarda en la BD)
+    seller_dict.pop("create_user", None)
+    new_seller = Seller(**seller_dict)
     db.add(new_seller)
     db.commit()
     db.refresh(new_seller)

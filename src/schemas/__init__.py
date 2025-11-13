@@ -36,6 +36,15 @@ from .inventory import (
     StockAdjustment,
     InventorySummary
 )
+from .visit import (
+    VisitCreate,
+    VisitUpdate,
+    VisitCancelRequest,
+    VisitResponse,
+    VisitDetailResponse,
+    ShopkeeperLowStockResponse,
+    VisitListResponse
+)
 
 from .route_schemas import (
     RoutePoint,
@@ -76,6 +85,14 @@ __all__ = [
     "StockAdjustment",
     "InventorySummary",
     "HealthResponse",
+    # Visit
+    "VisitCreate",
+    "VisitUpdate",
+    "VisitCancelRequest",
+    "VisitResponse",
+    "VisitDetailResponse",
+    "ShopkeeperLowStockResponse",
+    "VisitListResponse",
     # Route
     "RoutePoint",
     "RouteStatistics",
