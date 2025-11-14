@@ -7,6 +7,7 @@ from .shopkeeper import Shopkeeper
 from .assignment import Assignment
 from .inventory import ShopkeeperInventory
 from .visit import Visit
+from .seller_incidents import SellerIncident
 
 __all__ = [
     "Base",
@@ -16,5 +17,6 @@ __all__ = [
     "Shopkeeper",
     "Assignment",
     "ShopkeeperInventory",
-    "Visit"
+    "Visit",
+    "SellerIncident",
 ]

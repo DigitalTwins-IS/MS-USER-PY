@@ -81,7 +81,8 @@ from .routers import (
     assignments_router,
     routes_router,
     inventory_router,
-    visits_router
+    visits_router,
+    seller_incidents_router
 )
 
 # Incluir routers
@@ -122,6 +123,11 @@ app.include_router(
     tags=["visits"]
 )
 
+app.include_router(
+    seller_incidents_router,
+    prefix=settings.API_PREFIX,
+    tags=["seller_incidents"]
+)
 
 @app.get("/", include_in_schema=False)
 async def root():
