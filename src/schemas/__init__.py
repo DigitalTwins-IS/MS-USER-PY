@@ -46,6 +46,12 @@ from .visit import (
     VisitListResponse
 )
 
+from .seller_incidents import (
+    SellerIncidentCreate,
+    SellerIncidentUpdate,
+    SellerIncidentResponse
+)
+
 from .route_schemas import (
     RoutePoint,
     RouteStatistics,
@@ -93,6 +99,10 @@ __all__ = [
     "VisitDetailResponse",
     "ShopkeeperLowStockResponse",
     "VisitListResponse",
+    # Seller Incidents
+    "SellerIncidentCreate",
+    "SellerIncidentUpdate",
+    "SellerIncidentResponse",
     # Route
     "RoutePoint",
     "RouteStatistics",
