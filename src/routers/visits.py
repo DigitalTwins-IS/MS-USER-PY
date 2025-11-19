@@ -9,10 +9,10 @@ from typing import List, Optional
 from datetime import datetime, time, timedelta, timezone
 
 from ..models import (
-    get_db, Visit, Seller, Shopkeeper, Assignment, ShopkeeperInventory
+    get_db, Visit, Seller, Shopkeeper, Assignment, ShopkeeperInventory, SellerIncident
 )
 from ..schemas.visit import (
-    VisitCreate, VisitUpdate, VisitCancelRequest,
+    VisitCreate, VisitUpdate, VisitCancelRequest, VisitStatusUpdate,
     VisitResponse, VisitDetailResponse, ShopkeeperLowStockResponse,
     VisitListResponse
 )
@@ -293,6 +293,11 @@ async def get_visit(
     seller_obj = db.query(Seller).filter(Seller.id == visit.seller_id).first()
     shopkeeper = db.query(Shopkeeper).filter(Shopkeeper.id == visit.shopkeeper_id).first()
     
+    # Contar incidencias relacionadas con esta visita
+    incidents_count = db.query(SellerIncident).filter(
+        SellerIncident.visit_id == visit_id
+    ).count()
+    
     return VisitDetailResponse(
         id=visit.id,
         seller_id=visit.seller_id,
@@ -311,7 +316,8 @@ async def get_visit(
         cancelled_at=visit.cancelled_at,
         cancelled_reason=visit.cancelled_reason,
         created_at=visit.created_at,
-        updated_at=visit.updated_at
+        updated_at=visit.updated_at,
+        incidents_count=incidents_count
     )
 
 
@@ -505,17 +511,33 @@ async def cancel_visit(
             detail="Visita no encontrada"
         )
     
-    # Solo se pueden cancelar visitas pendientes
-    if visit.status != "pending":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"No se puede cancelar una visita {visit.status}"
+    # Permitir cancelar visitas en cualquier estado (flexibilidad)
+    # Si ya está cancelada, solo actualizar la razón si se proporciona
+    if visit.status == "cancelled" and cancel_data.cancelled_reason:
+        visit.cancelled_reason = cancel_data.cancelled_reason
+        db.commit()
+        db.refresh(visit)
+        return VisitResponse(
+            id=visit.id,
+            seller_id=visit.seller_id,
+            shopkeeper_id=visit.shopkeeper_id,
+            scheduled_date=visit.scheduled_date,
+            status=visit.status,
+            reason=visit.reason,
+            notes=visit.notes,
+            completed_at=visit.completed_at,
+            cancelled_at=visit.cancelled_at,
+            cancelled_reason=visit.cancelled_reason,
+            created_at=visit.created_at,
+            updated_at=visit.updated_at
         )
     
     # Cancelar la visita
     visit.status = "cancelled"
     visit.cancelled_at = datetime.now(timezone.utc)
     visit.cancelled_reason = cancel_data.cancelled_reason
+    # Limpiar completed_at si existía
+    visit.completed_at = None
     
     db.commit()
     db.refresh(visit)
@@ -571,16 +593,147 @@ async def complete_visit(
             detail="Visita no encontrada"
         )
     
-    # Solo se pueden completar visitas pendientes
-    if visit.status != "pending":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"No se puede completar una visita {visit.status}"
+    # Permitir completar visitas en cualquier estado (flexibilidad)
+    # Si ya está completada, solo actualizar el timestamp
+    if visit.status == "completed":
+        visit.completed_at = datetime.now(timezone.utc)
+        db.commit()
+        db.refresh(visit)
+        return VisitResponse(
+            id=visit.id,
+            seller_id=visit.seller_id,
+            shopkeeper_id=visit.shopkeeper_id,
+            scheduled_date=visit.scheduled_date,
+            status=visit.status,
+            reason=visit.reason,
+            notes=visit.notes,
+            completed_at=visit.completed_at,
+            cancelled_at=visit.cancelled_at,
+            cancelled_reason=visit.cancelled_reason,
+            created_at=visit.created_at,
+            updated_at=visit.updated_at
         )
     
     # Completar la visita
     visit.status = "completed"
     visit.completed_at = datetime.now(timezone.utc)
+    # Limpiar datos de cancelación si existían
+    visit.cancelled_at = None
+    visit.cancelled_reason = None
+    
+    db.commit()
+    db.refresh(visit)
+    
+    return VisitResponse(
+        id=visit.id,
+        seller_id=visit.seller_id,
+        shopkeeper_id=visit.shopkeeper_id,
+        scheduled_date=visit.scheduled_date,
+        status=visit.status,
+        reason=visit.reason,
+        notes=visit.notes,
+        completed_at=visit.completed_at,
+        cancelled_at=visit.cancelled_at,
+        cancelled_reason=visit.cancelled_reason,
+        created_at=visit.created_at,
+        updated_at=visit.updated_at
+    )
+
+
+# ============================================================================
+# CAMBIAR ESTADO DE VISITA
+# ============================================================================
+
+@router.patch("/visits/{visit_id}/status", response_model=VisitResponse)
+async def update_visit_status(
+    visit_id: int,
+    status_data: VisitStatusUpdate,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Cambiar el estado de una visita
+    Permite cambiar el estado entre: pending, completed, cancelled
+    
+    Reglas de negocio:
+    - Solo el vendedor propietario o ADMIN pueden cambiar el estado
+    - Se puede cambiar de cualquier estado a cualquier otro (flexibilidad)
+    - Si se cancela, se requiere cancelled_reason
+    - Si se completa, se registra completed_at automáticamente
+    - Si se vuelve a pending, se limpian completed_at y cancelled_at
+    """
+    user_role = current_user.get("role")
+    user_email = current_user.get("email")
+    user_id = current_user.get("user_id")
+    
+    # Obtener la visita
+    visit = db.query(Visit).filter(Visit.id == visit_id).first()
+    
+    if not visit:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Visita no encontrada"
+        )
+    
+    # Verificar permisos: ADMIN puede cambiar cualquier visita, VENDEDOR solo las suyas
+    if user_role != "ADMIN":
+        seller = get_seller_by_user(db, user_email, user_role, user_id)
+        if not seller or visit.seller_id != seller.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No tienes permisos para cambiar el estado de esta visita"
+            )
+    
+    # Validar transiciones de estado
+    current_status = visit.status
+    new_status = status_data.status
+    
+    # Si el estado no cambia, solo actualizar notas si se proporcionan
+    if current_status == new_status:
+        if status_data.notes:
+            visit.notes = status_data.notes
+        db.commit()
+        db.refresh(visit)
+        return VisitResponse(
+            id=visit.id,
+            seller_id=visit.seller_id,
+            shopkeeper_id=visit.shopkeeper_id,
+            scheduled_date=visit.scheduled_date,
+            status=visit.status,
+            reason=visit.reason,
+            notes=visit.notes,
+            completed_at=visit.completed_at,
+            cancelled_at=visit.cancelled_at,
+            cancelled_reason=visit.cancelled_reason,
+            created_at=visit.created_at,
+            updated_at=visit.updated_at
+        )
+    
+    # Cambiar estado según el nuevo valor
+    if new_status == "completed":
+        visit.status = "completed"
+        visit.completed_at = datetime.now(timezone.utc)
+        # Limpiar datos de cancelación si existían
+        visit.cancelled_at = None
+        visit.cancelled_reason = None
+    
+    elif new_status == "cancelled":
+        visit.status = "cancelled"
+        visit.cancelled_at = datetime.now(timezone.utc)
+        visit.cancelled_reason = status_data.cancelled_reason
+        # Limpiar datos de completado si existían
+        visit.completed_at = None
+    
+    elif new_status == "pending":
+        visit.status = "pending"
+        # Limpiar datos de completado y cancelación
+        visit.completed_at = None
+        visit.cancelled_at = None
+        visit.cancelled_reason = None
+    
+    # Actualizar notas si se proporcionan
+    if status_data.notes:
+        visit.notes = status_data.notes
     
     db.commit()
     db.refresh(visit)
@@ -808,3 +961,217 @@ async def get_shopkeeper_inventory_summary(
         "last_updated": max([item.last_updated for item in all_items]) if all_items else None
     }
 
+
+@router.get("/visits/generate-sample/status")
+async def check_sample_visits_status(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Verificar estado para generar visitas de muestra
+    Solo accesible para ADMIN
+    """
+    user_role = current_user.get("role")
+    
+    if user_role != "ADMIN":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo los administradores pueden ver este estado"
+        )
+    
+    sellers_count = db.query(Seller).filter(Seller.is_active == True).count()
+    shopkeepers_count = db.query(Shopkeeper).filter(Shopkeeper.is_active == True).count()
+    assignments_count = db.query(Assignment).filter(Assignment.is_active == True).count()
+    existing_visits_count = db.query(Visit).count()
+    
+    return {
+        "sellers_available": sellers_count,
+        "shopkeepers_available": shopkeepers_count,
+        "assignments_available": assignments_count,
+        "existing_visits": existing_visits_count,
+        "can_generate": sellers_count > 0 and shopkeepers_count > 0,
+        "message": "OK" if (sellers_count > 0 and shopkeepers_count > 0) else "Faltan vendedores o tenderos"
+    }
+
+
+@router.post("/visits/generate-sample", status_code=status.HTTP_201_CREATED)
+async def generate_sample_visits(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Generar visitas de muestra para demostración
+    Solo accesible para ADMIN
+    Crea visitas con diferentes estados para diferentes vendedores
+    """
+    user_role = current_user.get("role")
+    
+    # Solo ADMIN puede generar visitas de muestra
+    if user_role != "ADMIN":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo los administradores pueden generar visitas de muestra"
+        )
+    
+    # Obtener todos los vendedores activos
+    sellers = db.query(Seller).filter(Seller.is_active == True).all()
+    
+    if not sellers:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No hay vendedores activos en el sistema. Por favor, crea al menos un vendedor primero."
+        )
+    
+    # Obtener todos los tenderos activos
+    all_shopkeepers = db.query(Shopkeeper).filter(Shopkeeper.is_active == True).all()
+    
+    if not all_shopkeepers:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No hay tenderos activos en el sistema. Por favor, crea al menos un tendero primero."
+        )
+    
+    # Obtener todas las asignaciones activas
+    assignments = db.query(Assignment).filter(Assignment.is_active == True).all()
+    
+    # Crear un diccionario de vendedor -> tenderos asignados
+    seller_shopkeepers = {}
+    for assignment in assignments:
+        if assignment.seller_id not in seller_shopkeepers:
+            seller_shopkeepers[assignment.seller_id] = []
+        seller_shopkeepers[assignment.seller_id].append(assignment.shopkeeper_id)
+    
+    # Si no hay asignaciones, asignar tenderos a vendedores de forma circular
+    if not seller_shopkeepers:
+        # Asignar tenderos a vendedores de forma circular
+        for i, seller in enumerate(sellers[:min(10, len(sellers))]):
+            seller_shopkeepers[seller.id] = [all_shopkeepers[i % len(all_shopkeepers)].id]
+    
+    created_visits = []
+    now = datetime.now(timezone.utc)
+    
+    # Para cada vendedor, crear visitas con diferentes estados
+    for seller in sellers[:min(10, len(sellers))]:  # Máximo 10 vendedores
+        shopkeeper_ids = seller_shopkeepers.get(seller.id, [])
+        
+        if not shopkeeper_ids:
+            # Si aún no tiene tenderos, usar el primer tendero disponible
+            if all_shopkeepers:
+                shopkeeper_ids = [all_shopkeepers[0].id]
+            else:
+                continue
+        
+        # Crear visitas con diferentes porcentajes de cumplimiento
+        # Vendedor 1: 90% cumplimiento (9 completadas, 1 pendiente)
+        # Vendedor 2: 75% cumplimiento (6 completadas, 2 pendientes)
+        # Vendedor 3: 50% cumplimiento (5 completadas, 5 pendientes)
+        # Vendedor 4: 95% cumplimiento (19 completadas, 1 pendiente)
+        # Vendedor 5: 60% cumplimiento (3 completadas, 2 pendientes)
+        # etc.
+        
+        seller_index = sellers.index(seller) % 5
+        compliance_patterns = [
+            (9, 1, 0),   # 90% cumplimiento
+            (6, 2, 0),   # 75% cumplimiento
+            (5, 5, 0),   # 50% cumplimiento
+            (19, 1, 0),  # 95% cumplimiento
+            (3, 2, 0),   # 60% cumplimiento
+        ]
+        
+        completed_count, pending_count, cancelled_count = compliance_patterns[seller_index]
+        total_visits = completed_count + pending_count + cancelled_count
+        
+        # Crear visitas completadas
+        for i in range(completed_count):
+            shopkeeper_id = shopkeeper_ids[i % len(shopkeeper_ids)]
+            # Fechas en el pasado (últimos 30 días)
+            days_ago = (total_visits - i) % 30
+            scheduled_date = now - timedelta(days=days_ago, hours=9 + (i % 8))
+            completed_at = scheduled_date + timedelta(hours=1)
+            
+            visit = Visit(
+                seller_id=seller.id,
+                shopkeeper_id=shopkeeper_id,
+                scheduled_date=scheduled_date,
+                status="completed",
+                reason="reabastecimiento",
+                notes=f"Visita completada - Productos entregados",
+                completed_at=completed_at
+            )
+            db.add(visit)
+            created_visits.append(visit)
+        
+        # Crear visitas pendientes
+        for i in range(pending_count):
+            shopkeeper_id = shopkeeper_ids[(completed_count + i) % len(shopkeeper_ids)]
+            # Fechas futuras (próximos 7 días)
+            days_ahead = (i % 7) + 1
+            scheduled_date = now + timedelta(days=days_ahead, hours=9 + (i % 8))
+            
+            visit = Visit(
+                seller_id=seller.id,
+                shopkeeper_id=shopkeeper_id,
+                scheduled_date=scheduled_date,
+                status="pending",
+                reason="reabastecimiento",
+                notes=f"Visita programada - Pendiente de realizar"
+            )
+            db.add(visit)
+            created_visits.append(visit)
+        
+        # Crear visitas canceladas
+        for i in range(cancelled_count):
+            shopkeeper_id = shopkeeper_ids[(completed_count + pending_count + i) % len(shopkeeper_ids)]
+            # Fechas en el pasado
+            days_ago = (total_visits - i) % 30
+            scheduled_date = now - timedelta(days=days_ago, hours=9 + (i % 8))
+            cancelled_at = scheduled_date + timedelta(hours=0.5)
+            
+            visit = Visit(
+                seller_id=seller.id,
+                shopkeeper_id=shopkeeper_id,
+                scheduled_date=scheduled_date,
+                status="cancelled",
+                reason="reabastecimiento",
+                notes=f"Visita cancelada",
+                cancelled_at=cancelled_at,
+                cancelled_reason="Tendero no disponible"
+            )
+            db.add(visit)
+            created_visits.append(visit)
+    
+    if not created_visits:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No se pudieron crear visitas. Verifica que haya vendedores con tenderos asignados."
+        )
+    
+    try:
+        db.commit()
+        
+        # Refrescar todas las visitas creadas
+        for visit in created_visits:
+            db.refresh(visit)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al guardar las visitas: {str(e)}"
+        )
+    
+    return {
+        "message": f"Se crearon {len(created_visits)} visitas de muestra exitosamente",
+        "total_created": len(created_visits),
+        "sellers_processed": len(set(v.seller_id for v in created_visits)),
+        "shopkeepers_used": len(set(v.shopkeeper_id for v in created_visits)),
+        "visits": [
+            {
+                "id": visit.id,
+                "seller_id": visit.seller_id,
+                "shopkeeper_id": visit.shopkeeper_id,
+                "status": visit.status,
+                "scheduled_date": visit.scheduled_date.isoformat()
+            }
+            for visit in created_visits[:20]  # Mostrar solo las primeras 20
+        ]
+    }

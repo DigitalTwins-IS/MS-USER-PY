@@ -4,11 +4,11 @@ Valida tokens generados por MS-AUTH-PY
 """
 from jose import JWTError, jwt
 from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from ..config import settings
 
-# OAuth2 scheme para el header Authorization
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="http://localhost:8001/api/v1/auth/login")
+# HTTP Bearer scheme para el header Authorization (más simple para Swagger)
+http_bearer = HTTPBearer(auto_error=False)
 
 
 def decode_token(token: str) -> dict:
@@ -33,7 +33,7 @@ def decode_token(token: str) -> dict:
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         email: str = payload.get("sub")
-        role: str = payload.get("role")
+        role: str = payload.get("role", "").upper()  # Normalizar a mayúsculas
         user_id: int = payload.get("user_id")
         
         if email is None:
@@ -49,19 +49,27 @@ def decode_token(token: str) -> dict:
         raise credentials_exception
 
 
-async def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
+async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(http_bearer)) -> dict:
     """
     Obtiene el usuario actual desde el token JWT
     
     Args:
-        token: Token JWT del header Authorization
+        credentials: Credenciales HTTP Bearer del header Authorization
         
     Returns:
         dict: Información del usuario (email, role)
         
     Raises:
-        HTTPException: Si el token es inválido
+        HTTPException: Si el token es inválido o no está presente
     """
+    if not credentials:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token de autenticación requerido",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    token = credentials.credentials
     user_data = decode_token(token)
     return user_data
 
@@ -79,7 +87,7 @@ async def require_admin(current_user: dict = Depends(get_current_user)) -> dict:
     Raises:
         HTTPException: Si el usuario no es administrador
     """
-    if current_user.get("role") != "admin":
+    if current_user.get("role") != "ADMIN":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tienes permisos de administrador"
