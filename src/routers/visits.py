@@ -127,7 +127,7 @@ async def list_visits(
     start_date: Optional[datetime] = Query(None, description="Fecha de inicio"),
     end_date: Optional[datetime] = Query(None, description="Fecha de fin"),
     skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=100),
+    limit: int = Query(100, ge=1, le=10000),  # Aumentado para reportes que necesitan todas las visitas
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
