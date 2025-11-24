@@ -14,6 +14,7 @@ class SellerLocationCreate(BaseModel):
     longitude: float = Field(..., ge=-180, le=180, description="Longitud")
     accuracy: Optional[float] = Field(None, ge=0, description="Precisión GPS en metros")
     speed: Optional[float] = Field(None, ge=0, description="Velocidad en km/h")
+    heading: Optional[float] = Field(None, ge=0, lt=360, description="Dirección en grados")
     status: Literal["active", "inactive", "offline"] = Field("active", description="Estado del vendedor")
     battery_level: Optional[int] = Field(None, ge=0, le=100, description="Nivel de batería")
     
