@@ -2,7 +2,7 @@
 Schemas de Visita (Visit)
 HU21: Agendar visitas basadas en inventario
 """
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List, Literal
 from datetime import datetime
 
@@ -56,6 +56,30 @@ class VisitCancelRequest(BaseModel):
         }
 
 
+class VisitStatusUpdate(BaseModel):
+    """Schema para cambiar el estado de una visita"""
+    status: Literal["pending", "completed", "cancelled"] = Field(..., description="Nuevo estado de la visita")
+    cancelled_reason: Optional[str] = Field(None, description="Razón de cancelación (requerido si status es 'cancelled')")
+    notes: Optional[str] = Field(None, description="Notas adicionales sobre el cambio de estado")
+    
+    @field_validator('cancelled_reason')
+    @classmethod
+    def validate_cancelled_reason(cls, v, info):
+        """Validar que cancelled_reason esté presente si el status es 'cancelled'"""
+        if info.data.get('status') == 'cancelled' and not v:
+            raise ValueError("cancelled_reason es requerido cuando el status es 'cancelled'")
+        return v
+    
+    class Config:
+        from_attributes = True
+        json_schema_extra = {
+            "example": {
+                "status": "completed",
+                "notes": "Visita completada exitosamente"
+            }
+        }
+
+
 class VisitResponse(BaseModel):
     """Schema para respuesta de visita"""
     id: int = Field(..., description="ID de la visita")
@@ -99,6 +123,7 @@ class VisitDetailResponse(VisitResponse):
     shopkeeper_phone: Optional[str] = Field(None, description="Teléfono del tendero")
     shopkeeper_email: Optional[str] = Field(None, description="Email del tendero")
     seller_name: str = Field(..., description="Nombre del vendedor")
+    incidents_count: Optional[int] = Field(0, description="Cantidad de incidencias relacionadas con esta visita")
     
     class Config:
         from_attributes = True

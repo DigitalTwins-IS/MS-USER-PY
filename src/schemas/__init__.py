@@ -40,6 +40,7 @@ from .visit import (
     VisitCreate,
     VisitUpdate,
     VisitCancelRequest,
+    VisitStatusUpdate,
     VisitResponse,
     VisitDetailResponse,
     ShopkeeperLowStockResponse,
@@ -49,7 +50,8 @@ from .visit import (
 from .seller_incidents import (
     SellerIncidentCreate,
     SellerIncidentUpdate,
-    SellerIncidentResponse
+    SellerIncidentResponse,
+    SellerIncidentDetailResponse
 )
 
 from .tracking import (
@@ -111,6 +113,7 @@ __all__ = [
     "VisitCreate",
     "VisitUpdate",
     "VisitCancelRequest",
+    "VisitStatusUpdate",
     "VisitResponse",
     "VisitDetailResponse",
     "ShopkeeperLowStockResponse",
