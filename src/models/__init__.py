@@ -8,6 +8,8 @@ from .assignment import Assignment
 from .inventory import ShopkeeperInventory
 from .visit import Visit
 from .seller_incidents import SellerIncident
+from .seller_location import SellerLocation
+from .geocoding_cache import GeocodingCache
 
 __all__ = [
     "Base",
@@ -19,4 +21,6 @@ __all__ = [
     "ShopkeeperInventory",
     "Visit",
     "SellerIncident",
+    "SellerLocation",
+    "GeocodingCache",
 ]

@@ -5,10 +5,10 @@ FastAPI Application
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
-from .routers import routes_router
 
 
 from .config import settings
+from .clients import init_openroute_client
 
 # Crear aplicación FastAPI
 app = FastAPI(
@@ -29,6 +29,8 @@ app = FastAPI(
     * **HU2**: Como administrador, quiero registrar vendedores y asignarlos a zonas
     * **HU3**: Como administrador, quiero registrar tenderos con latitud/longitud
     * **HU4**: Como administrador, quiero actualizar datos de vendedores y tenderos
+    * **HU13**: Como vendedor, quiero obtener una ruta optimizada para visitar mis tenderos asignados
+    * **HU18**: tiempo real la ubicación del vendedor que viene a mi tienda
     * **HU21**: Como vendedor, quiero agendar visitas basadas en inventario
     """,
     docs_url="/docs",
@@ -45,24 +47,24 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Incluir routers
+app.include_router(
+    sellers_router,
+    prefix=settings.API_PREFIX,
+    tags=["sellers"])
+
 # Importar y configurar routers después de crear la app para evitar imports circulares
 from .routers import (
     sellers_router,
     shopkeepers_router,
     assignments_router,
     routes_router,
+    tracking_router,      
+    geocoding_router,
     inventory_router,
     visits_router,
     seller_incidents_router
 )
-
-# Incluir routers
-app.include_router(
-    sellers_router,
-    prefix=settings.API_PREFIX,
-    tags=["sellers"]
-)
-# ROUTERS DE USUARIOS
 
 app.include_router(
     shopkeepers_router,
@@ -100,11 +102,41 @@ app.include_router(
     tags=["seller_incidents"]
 )
 
+app.include_router(
+    tracking_router,
+    prefix=f"{settings.API_PREFIX}/tracking",
+    tags=["Tracking"]
+)
+
+app.include_router(
+    geocoding_router,
+    prefix=f"{settings.API_PREFIX}/geocoding",
+    tags=["Geocoding"]
+)
+
+@app.on_event("startup")
+async def startup_event():
+    """Evento de inicio de la aplicación"""
+    print(f" {settings.APP_NAME} v{settings.APP_VERSION} iniciado")
+    
+    # CORREGIDO: Ahora pasa la api_key como parámetro
+    if settings.OPENROUTE_ENABLED and settings.OPENROUTE_API_KEY:
+       init_openroute_client(api_key=settings.OPENROUTE_API_KEY)
+       print("✅ OpenRouteService inicializado")
+    else:
+        print("ℹ️ OpenRouteService NO configurado - La generación de rutas usará Haversine")
+    
+    if settings.NOMINATIM_ENABLED:
+        print("✅ Nominatim habilitado")
+    
+    print(f"📚 Documentación: http://{settings.SERVICE_HOST}:{settings.SERVICE_PORT}/docs")
+    print("🚀 Aplicación lista para recibir requests")
+
+
 @app.get("/", include_in_schema=False)
 async def root():
     """Redireccionar a la documentación"""
     return RedirectResponse(url="/docs")
-
 
 @app.get("/health", tags=["Health"])
 async def root_health():
@@ -112,7 +144,9 @@ async def root_health():
     return {
         "status": "healthy",
         "service": settings.APP_NAME,
-        "version": settings.APP_VERSION
+        "version": settings.APP_VERSION,
+        "openroute_enabled": settings.OPENROUTE_ENABLED,
+        "nominatim_enabled": settings.NOMINATIM_ENABLED
     }
 
 @app.get("/test-inventory/{shopkeeper_id}/summary", tags=["Test"])
@@ -163,7 +197,6 @@ async def test_inventory(shopkeeper_id: int):
         }
     ]
 
-
 # Event handlers
 @app.on_event("startup")
 async def startup_event():
@@ -173,12 +206,33 @@ async def startup_event():
     print(f"[INFO] Endpoints de usuarios en: {settings.API_PREFIX}")
     print(f"[INFO] Integraciones: MS-GEO ({settings.MS_GEO_URL})")
 
-
 @app.on_event("shutdown")
 async def shutdown_event():
     """Evento de cierre de la aplicación"""
     print(f"[SHUTDOWN] {settings.APP_NAME} detenido")
 
+
+@app.get("/status", tags=["Health"])
+async def status():
+    """Status completo del servicio"""
+    return {
+        "status": "healthy",
+        "service": settings.APP_NAME,
+        "version": settings.APP_VERSION,
+        "features": {
+            "openroute_service": settings.OPENROUTE_ENABLED,
+            "nominatim_geocoding": settings.NOMINATIM_ENABLED,
+            "route_caching": True,
+            "real_time_tracking": True
+        },
+        "endpoints": {
+            "sellers": f"{settings.API_PREFIX}/sellers",
+            "shopkeepers": f"{settings.API_PREFIX}/shopkeepers", 
+            "routes": f"{settings.API_PREFIX}/routes",
+            "tracking": f"{settings.API_PREFIX}/tracking",
+            "geocoding": f"{settings.API_PREFIX}/geocoding"
+        }
+    }
 
 if __name__ == "__main__":
     import uvicorn
@@ -189,4 +243,3 @@ if __name__ == "__main__":
         port=settings.SERVICE_PORT,
         reload=settings.DEBUG
     )
-

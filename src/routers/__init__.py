@@ -8,6 +8,8 @@ from .routes import router as routes_router
 from .inventory import router as inventory_router
 from .visits import router as visits_router
 from .seller_incidents import router as seller_incidents_router
+from .tracking import router as tracking_router
+from .geocoding import router as geocoding_router
 
 __all__ = [
     "sellers_router",
@@ -17,6 +19,6 @@ __all__ = [
     "inventory_router",
     "visits_router",
     "seller_incidents_router"
+    "tracking_router",
+    "geocoding_router"
 ]
-
-

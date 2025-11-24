@@ -4,6 +4,7 @@ Router de Tenderos (Shopkeepers) - HU3
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
+from ..clients import nominatim_client
 
 from ..models import get_db, Shopkeeper, Assignment, Seller
 from ..schemas import (
@@ -183,4 +184,47 @@ async def delete_shopkeeper(
     shopkeeper.is_active = False
     db.commit()
     return None
+
+@router.get("/shopkeepers/geocode")
+async def geocode_address(
+    address: str = Query(..., min_length=3, description="Dirección a buscar"),
+    city: str = Query("Bogotá", description="Ciudad"),
+    current_user: dict = Depends(get_current_user)
+):
+    if not settings.NOMINATIM_ENABLED:
+        raise HTTPException(503, "Servicio de geocoding no disponible")
+    
+    result = await nominatim_client.geocode(address, city)
+    
+    if not result:
+        raise HTTPException(404, f"No se encontró la dirección: '{address}' en {city}")
+    
+    return {
+        "address": address,
+        "city": city,
+        "coordinates": {
+            "latitude": result["latitude"],
+            "longitude": result["longitude"]
+        },
+        "full_address": result["display_name"],
+        "confidence": result["confidence"]
+    }
+
+
+@router.get("/shopkeepers/reverse-geocode")
+async def reverse_geocode_location(
+    latitude: float = Query(..., ge=-90, le=90),
+    longitude: float = Query(..., ge=-180, le=180),
+    current_user: dict = Depends(get_current_user)
+):
+    """HU3: Obtener dirección desde coordenadas"""
+    if not settings.NOMINATIM_ENABLED:
+        raise HTTPException(503, "Servicio de geocoding no disponible")
+    
+    result = await nominatim_client.reverse_geocode(latitude, longitude)
+    
+    if not result:
+        raise HTTPException(404, f"No se encontró dirección en: {latitude}, {longitude}")
+    
+    return {"coordinates": {"latitude": latitude, "longitude": longitude}, **result}
 

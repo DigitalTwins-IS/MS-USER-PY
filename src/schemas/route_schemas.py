@@ -62,6 +62,8 @@ class OptimizedRouteResponse(BaseModel):
     route_points: List[RoutePoint] = Field(..., description="Puntos de la ruta ordenados")
     statistics: RouteStatistics = Field(..., description="Estadísticas de la ruta")
     algorithm_used: str = Field(..., description="Algoritmo utilizado")
+    api_data: Optional[dict] = Field(None, description="Datos de la API (geometría, distancias, etc.)")
+
     
     class Config:
         json_schema_extra = {
@@ -112,3 +114,29 @@ class RouteVisualizationRequest(BaseModel):
                 "show_order": True
             }
         }
+        
+class RouteOptimizationRequest(BaseModel):
+    """Solicitud de optimización de ruta"""
+    seller_id: int = Field(..., description="ID del vendedor")
+    start_latitude: Optional[float] = Field(None, description="Latitud punto de inicio")
+    start_longitude: Optional[float] = Field(None, description="Longitud punto de inicio")
+    force_recalculate: bool = Field(False, description="Forzar recálculo (ignorar caché)")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "seller_id": 1,
+                "start_latitude": 4.6097,
+                "start_longitude": -74.0817,
+                "force_recalculate": False
+            }
+        }
+
+
+class CacheStats(BaseModel):
+    """Estadísticas del caché de rutas"""
+    total_routes: int = Field(..., description="Total de rutas en caché")
+    hits: int = Field(..., description="Total de hits")
+    misses: int = Field(..., description="Total de misses")
+    hit_rate: float = Field(..., description="Porcentaje de hit rate")
+    ttl_hours: float = Field(..., description="TTL en horas")

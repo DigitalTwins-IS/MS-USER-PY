@@ -5,6 +5,7 @@ Gestiona la relación entre vendedores y tenderos
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from typing import List
+from ..cache import route_cache
 
 from ..models import get_db, Assignment, Seller, Shopkeeper
 from ..schemas import (
@@ -65,6 +66,7 @@ async def assign_shopkeeper(
     db.add(new_assignment)
     db.commit()
     db.refresh(new_assignment)
+    route_cache.invalidate_seller(assignment_data.seller_id) 
     
     # Preparar respuesta con nombres
     response_data = {
@@ -121,6 +123,8 @@ async def reassign_shopkeeper(
     db.add(new_assignment)
     db.commit()
     db.refresh(new_assignment)
+    route_cache.invalidate_seller(current_assignment.seller_id)
+    route_cache.invalidate_seller(reassignment_data.new_seller_id)
     
     response_data = {
         **new_assignment.__dict__,
@@ -223,5 +227,6 @@ async def unassign_shopkeeper(
     assignment.unassigned_by = 1  # TODO: Obtener del current_user
     
     db.commit()
+    route_cache.invalidate_seller(seller_id)
     return None
 
