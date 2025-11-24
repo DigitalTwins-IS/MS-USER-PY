@@ -2,7 +2,7 @@
 Configuración del microservicio MS-USER-PY
 """
 from pydantic_settings import BaseSettings
-
+from typing import List
 
 class Settings(BaseSettings):
     """Configuración de la aplicación"""
@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     APP_VERSION: str = "1.0.0"
     API_PREFIX: str = "/api/v1/users"
     DEBUG: bool = False
+
+    
     
     # Database Configuration
     DATABASE_URL: str = "postgresql://dgt_user:dgt_pass@localhost:5437/digital_twins_db"
@@ -41,7 +43,7 @@ class Settings(BaseSettings):
     MAX_SELLERS_PER_ZONE: int = 10  # Recomendado, no hard limit
     
     OPENROUTE_API_KEY: str = ""
-    OPENROUTE_ENABLED: bool = False
+    OPENROUTE_ENABLED: bool = True
     
     # Nominatim (Geocoding)
     NOMINATIM_ENABLED: bool = True
@@ -50,9 +52,6 @@ class Settings(BaseSettings):
     # Route Cache
     ROUTE_CACHE_TTL_HOURS: int = 24
     ROUTE_CACHE_MAX_SIZE: int = 1000
-    
-    # Fallback behavior
-    USE_HAVERSINE_FALLBACK: bool = True
     
     class Config:
         env_file = ".env"

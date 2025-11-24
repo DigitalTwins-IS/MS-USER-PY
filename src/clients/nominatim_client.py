@@ -1,99 +1,158 @@
+"""
+Cliente Nominatim - OpenStreetMap Geocoding
+100% Gratis, sin API key, sin registro
+Rate limit: 1 request/segundo
+"""
 import httpx
 import asyncio
 from typing import Optional, Dict, List
 from datetime import datetime
+from sqlalchemy.orm import Session
+
+from ..models import get_db
 
 
 class NominatimClient:
     """
-    Cliente para Nominatim API
+    Cliente para Nominatim (OSM Geocoding)
     
-    CRÍTICO:
+    Docs: https://nominatim.org/release-docs/latest/api/
+    
+    IMPORTANTE:
+    - SIEMPRE incluir User-Agent válido
     - Máximo 1 request/segundo
-    - User-Agent obligatorio con info de contacto
-    - Uso educativo/investigación permitido
-    
-    Funcionalidades:
-    - Geocoding: Dirección → Coordenadas
-    - Reverse Geocoding: Coordenadas → Dirección
-    - Search: Buscar lugares por nombre
+    - Uso educativo permitido
     """
     
     BASE_URL = "https://nominatim.openstreetmap.org"
     
-    def __init__(self, user_agent: str = "DigitalTwins-UniversityProject/1.0"):
-        """
-        Args:
-            user_agent: OBLIGATORIO - Identificación de tu aplicación
-                       Incluye email en producción
-        """
+    def __init__(self, user_agent: str = "DigitalTwins-University/1.0 (Educational Project)"):
         self.headers = {
             "User-Agent": user_agent,
-            "Accept-Language": "es-CO,es;q=0.9,en;q=0.8"
+            "Accept-Language": "es-CO,es;q=0.9",
+            "Accept": "application/json"
         }
-        self._last_request_time = 0
-        self._request_count = 0
+        self._last_request = 0
+        self._cache_enabled = True
     
     async def _rate_limit(self):
-        """
-        Respeta el límite de 1 request/segundo
+        """Respeta límite de 1 req/segundo"""
+        now = datetime.now().timestamp()
+        elapsed = now - self._last_request
         
-        ⚠️ NO MODIFICAR - O serás bloqueado permanentemente
-        """
-        current_time = datetime.now().timestamp()
-        time_since_last = current_time - self._last_request_time
+        if elapsed < 1.0:
+            wait_time = 1.0 - elapsed
+            print(f"⏳ Rate limit: esperando {wait_time:.2f}s")
+            await asyncio.sleep(wait_time)
         
-        if time_since_last < 1.0:
-            sleep_time = 1.0 - time_since_last
-            await asyncio.sleep(sleep_time)
+        self._last_request = datetime.now().timestamp()
+    
+    async def _get_from_cache(self, address: str, city: str, db: Session) -> Optional[Dict]:
+        """Busca en caché de base de datos"""
+        if not self._cache_enabled:
+            return None
         
-        self._last_request_time = datetime.now().timestamp()
-        self._request_count += 1
+        try:
+            from ..models.geocoding_cache import GeocodingCache
+            
+            cached = db.query(GeocodingCache).filter(
+                GeocodingCache.address == address,
+                GeocodingCache.city == city
+            ).first()
+            
+            if cached:
+                print(f"✅ Geocoding CACHE HIT: {address}, {city}")
+                # Actualizar contador de uso
+                cached.last_used = datetime.now()
+                cached.usage_count += 1
+                db.commit()
+                
+                return {
+                    "latitude": float(cached.latitude),
+                    "longitude": float(cached.longitude),
+                    "display_name": cached.display_name,
+                    "confidence": float(cached.confidence) if cached.confidence else 0.8,
+                    "from_cache": True
+                }
+            
+            return None
+        except Exception as e:
+            print(f"⚠️ Error leyendo caché: {e}")
+            return None
+    
+    async def _save_to_cache(self, address: str, city: str, result: Dict, db: Session):
+        """Guarda resultado en caché"""
+        try:
+            from ..models.geocoding_cache import GeocodingCache
+            
+            cached = GeocodingCache(
+                address=address,
+                city=city,
+                country="Colombia",
+                latitude=result["latitude"],
+                longitude=result["longitude"],
+                display_name=result.get("display_name", ""),
+                confidence=result.get("confidence", 0.8),
+                provider="nominatim"
+            )
+            
+            db.add(cached)
+            db.commit()
+            print(f"💾 Geocoding guardado en caché: {address}, {city}")
+            
+        except Exception as e:
+            print(f"⚠️ Error guardando en caché: {e}")
+            db.rollback()
     
     async def geocode(
         self,
         address: str,
         city: str = "Bogotá",
         country: str = "Colombia",
-        limit: int = 1
+        db: Session = None,
+        use_cache: bool = True
     ) -> Optional[Dict]:
         """
-        Convertir dirección en coordenadas
+        Convierte dirección en coordenadas
         
         Args:
             address: "Calle 72 #10-34"
             city: "Bogotá"
             country: "Colombia"
-            limit: Número máximo de resultados
+            db: Sesión de base de datos (para caché)
+            use_cache: Usar caché si está disponible
         
         Returns:
             {
                 'latitude': 4.6533,
                 'longitude': -74.0602,
-                'display_name': 'Calle 72 #10-34, Chapinero, Bogotá...',
+                'display_name': 'Calle 72 #10-34, Bogotá...',
                 'confidence': 0.9,
-                'address': {...}
+                'from_cache': False
             }
-        
-        Example:
-            >>> result = await client.geocode("Calle 72 #10-34", "Bogotá")
-            >>> print(result['latitude'])
-            4.6533
         """
+        # Intentar obtener del caché
+        if use_cache and db:
+            cached = await self._get_from_cache(address, city, db)
+            if cached:
+                return cached
+        
+        # Rate limiting
         await self._rate_limit()
         
+        # Construir query
         full_query = f"{address}, {city}, {country}"
         
         params = {
             "q": full_query,
             "format": "json",
-            "limit": limit,
+            "limit": 1,
             "addressdetails": 1,
             "dedupe": 1
         }
         
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            async with httpx.AsyncClient(timeout=15.0) as client:
                 response = await client.get(
                     f"{self.BASE_URL}/search",
                     params=params,
@@ -104,57 +163,53 @@ class NominatimClient:
                     results = response.json()
                     
                     if results and len(results) > 0:
-                        best_result = results[0]
+                        best = results[0]
                         
-                        return {
-                            "latitude": float(best_result["lat"]),
-                            "longitude": float(best_result["lon"]),
-                            "display_name": best_result.get("display_name", ""),
-                            "address": best_result.get("address", {}),
-                            "confidence": self._calculate_confidence(best_result),
-                            "osm_type": best_result.get("osm_type", ""),
-                            "place_id": best_result.get("place_id", "")
+                        result = {
+                            "latitude": float(best["lat"]),
+                            "longitude": float(best["lon"]),
+                            "display_name": best.get("display_name", ""),
+                            "address_parts": best.get("address", {}),
+                            "confidence": self._calc_confidence(best),
+                            "osm_type": best.get("osm_type", ""),
+                            "place_id": best.get("place_id", ""),
+                            "from_cache": False
                         }
-                    else:
-                        print(f"⚠️ Nominatim: No resultados para '{full_query}'")
-                        return None
+                        
+                        # Guardar en caché
+                        if db:
+                            await self._save_to_cache(address, city, result, db)
+                        
+                        return result
+                    
+                    print(f"❌ No se encontró: {full_query}")
+                    return None
                 
                 elif response.status_code == 429:
-                    print("❌ Nominatim: Rate limit excedido")
+                    print("❌ Rate limit excedido - Esperando 60s")
                     await asyncio.sleep(60)
                     return None
                 
                 else:
-                    print(f"❌ Nominatim error {response.status_code}: {response.text[:100]}")
+                    print(f"❌ Error {response.status_code}: {response.text}")
                     return None
                     
-        except httpx.TimeoutException:
-            print(f"⏱️ Nominatim: Timeout para '{address}'")
-            return None
         except Exception as e:
-            print(f"❌ Nominatim error: {e}")
+            print(f"❌ Error geocoding: {e}")
             return None
     
-    def _calculate_confidence(self, result: Dict) -> float:
-        """
-        Calcular confianza del resultado (0.0 - 1.0)
-        
-        Nominatim no provee score directo, lo estimamos por:
-        - Tipo de resultado (node > way > relation)
-        - Nivel de detalle en address
-        """
+    def _calc_confidence(self, result: Dict) -> float:
+        """Calcula score de confianza (0.0 - 1.0)"""
         osm_type = result.get("osm_type", "")
         address = result.get("address", {})
         
-        # Score base por tipo de objeto
         type_scores = {
-            "node": 0.9,      # Punto específico (edificio)
-            "way": 0.7,       # Vía (calle)
-            "relation": 0.5   # Área (barrio, zona)
+            "node": 0.9,
+            "way": 0.7,
+            "relation": 0.5
         }
         score = type_scores.get(osm_type, 0.3)
         
-        # Bonus por detalles
         if "house_number" in address:
             score += 0.1
         if "road" in address:
@@ -169,27 +224,20 @@ class NominatimClient:
         zoom: int = 18
     ) -> Optional[Dict]:
         """
-        Convertir coordenadas en dirección
+        Convierte coordenadas en dirección
         
         Args:
             latitude: 4.6533
             longitude: -74.0602
-            zoom: Nivel de detalle (18=edificio, 16=calle, 10=ciudad)
+            zoom: Nivel de detalle (18=edificio, 10=ciudad)
         
         Returns:
             {
                 'address': 'Calle 72 #10-34, Chapinero, Bogotá',
                 'street': 'Calle 72',
-                'house_number': '10-34',
                 'neighbourhood': 'Chapinero',
-                'city': 'Bogotá',
-                'country': 'Colombia'
+                'city': 'Bogotá'
             }
-        
-        Example:
-            >>> result = await client.reverse_geocode(4.6533, -74.0602)
-            >>> print(result['address'])
-            'Calle 72 #10-34, Chapinero, Bogotá, Colombia'
         """
         await self._rate_limit()
         
@@ -202,7 +250,7 @@ class NominatimClient:
         }
         
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            async with httpx.AsyncClient(timeout=15.0) as client:
                 response = await client.get(
                     f"{self.BASE_URL}/reverse",
                     params=params,
@@ -213,114 +261,27 @@ class NominatimClient:
                     result = response.json()
                     
                     if "error" not in result:
-                        address_parts = result.get("address", {})
+                        addr = result.get("address", {})
                         
                         return {
-                            "address": result.get("display_name", "Dirección desconocida"),
-                            "street": address_parts.get("road", ""),
-                            "house_number": address_parts.get("house_number", ""),
-                            "neighbourhood": address_parts.get("neighbourhood", ""),
-                            "suburb": address_parts.get("suburb", ""),
-                            "city": address_parts.get("city", address_parts.get("town", "")),
-                            "state": address_parts.get("state", ""),
-                            "country": address_parts.get("country", "Colombia"),
-                            "postcode": address_parts.get("postcode", "")
+                            "address": result.get("display_name", ""),
+                            "street": addr.get("road", ""),
+                            "house_number": addr.get("house_number", ""),
+                            "neighbourhood": addr.get("neighbourhood", addr.get("suburb", "")),
+                            "city": addr.get("city", addr.get("town", "")),
+                            "state": addr.get("state", ""),
+                            "country": addr.get("country", "Colombia"),
+                            "postcode": addr.get("postcode", "")
                         }
-                    else:
-                        print(f"⚠️ Nominatim: Sin dirección en {latitude}, {longitude}")
-                        return None
-                
-                else:
-                    print(f"❌ Nominatim error {response.status_code}")
+                    
                     return None
-                    
+                
+                return None
+                
         except Exception as e:
-            print(f"❌ Nominatim reverse error: {e}")
+            print(f"❌ Error reverse geocoding: {e}")
             return None
-    
-    async def search_place(
-        self,
-        query: str,
-        city: str = "Bogotá",
-        limit: int = 5
-    ) -> List[Dict]:
-        """
-        Buscar lugares (negocios, puntos de interés)
-        
-        Args:
-            query: "Hospital San Ignacio"
-            city: "Bogotá"
-            limit: Máximo de resultados
-        
-        Returns:
-            [
-                {
-                    'name': 'Hospital Universitario San Ignacio',
-                    'latitude': 4.6279,
-                    'longitude': -74.0648,
-                    'type': 'hospital'
-                },
-                ...
-            ]
-        
-        Example:
-            >>> results = await client.search_place("Universidad Nacional")
-            >>> print(results[0]['name'])
-            'Universidad Nacional de Colombia'
-        """
-        await self._rate_limit()
-        
-        full_query = f"{query}, {city}, Colombia"
-        
-        params = {
-            "q": full_query,
-            "format": "json",
-            "limit": limit,
-            "addressdetails": 1
-        }
-        
-        try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                response = await client.get(
-                    f"{self.BASE_URL}/search",
-                    params=params,
-                    headers=self.headers
-                )
-                
-                if response.status_code == 200:
-                    results = response.json()
-                    
-                    places = []
-                    for result in results:
-                        places.append({
-                            "name": result.get("display_name", "").split(",")[0],
-                            "full_address": result.get("display_name", ""),
-                            "latitude": float(result["lat"]),
-                            "longitude": float(result["lon"]),
-                            "type": result.get("type", ""),
-                            "place_id": result.get("place_id", "")
-                        })
-                    
-                    return places
-                
-                else:
-                    print(f"❌ Nominatim search error {response.status_code}")
-                    return []
-                    
-        except Exception as e:
-            print(f"❌ Nominatim search error: {e}")
-            return []
-    
-    def get_stats(self) -> Dict:
-        """Obtener estadísticas de uso"""
-        return {
-            "total_requests": self._request_count,
-            "rate_limit": "1 request/segundo",
-            "service": "Nominatim OSM"
-        }
 
 
 # Instancia global
-nominatim_client = NominatimClient(
-    user_agent="DigitalTwins-IS/1.0 (University Project; Contact: vale@university.edu)"
-)
+nominatim_client = NominatimClient()
