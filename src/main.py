@@ -47,12 +47,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Incluir routers
-app.include_router(
-    sellers_router,
-    prefix=settings.API_PREFIX,
-    tags=["sellers"])
-
 # Importar y configurar routers después de crear la app para evitar imports circulares
 from .routers import (
     sellers_router,
@@ -65,6 +59,12 @@ from .routers import (
     visits_router,
     seller_incidents_router
 )
+
+# Incluir routers
+app.include_router(
+    sellers_router,
+    prefix=settings.API_PREFIX,
+    tags=["sellers"])
 
 app.include_router(
     shopkeepers_router,
