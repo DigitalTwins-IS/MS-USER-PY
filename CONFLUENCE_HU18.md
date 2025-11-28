@@ -5,7 +5,8 @@
 **Versión**: 1.0.0  
 **Última actualización**: Noviembre 28, 2025  
 **Autor**: Equipo MS-USER-PY  
-**Revisores**: Arquitectura, Product Management
+**Revisores**: Arquitectura, Product Management  
+**Basado en**: HU13 (Rutas Optimizadas) - Mejoras y extensiones
 {info}
 
 ---
@@ -17,13 +18,18 @@
 ## 1. Resumen Ejecutivo
 
 {panel:title=Descripción General|borderStyle=solid|borderColor=#ccc|titleBGColor=#E8F5E9|bgColor=#F1F8E9}
-La **Historia de Usuario 18 (HU18)** implementa un sistema de seguimiento GPS en tiempo real utilizando WebSockets que permite a los tenderos visualizar la ubicación actual de su vendedor asignado en un mapa interactivo.
+La **Historia de Usuario 18 (HU18)** representa una **mejora y evolución** de **HU13 (Rutas Optimizadas)**, implementando un sistema de seguimiento GPS en tiempo real utilizando WebSockets.
+
+**Evolución desde HU13**:
+* **HU13 (Base)**: Rutas optimizadas estáticas con OpenRouteService
+* **HU18 (Mejoras)**: Tracking en tiempo real con WebSockets, sistema de observadores, datos enriquecidos
 
 **Valor de Negocio**:
 * Transparencia en las visitas de vendedores
 * Reducción de tiempos de espera
 * Mejor coordinación entre vendedores y tenderos
 * Monitoreo administrativo de la flota de vendedores
+* Comparación de ruta planificada (HU13) vs. ruta real (HU18)
 {panel}
 
 ### 1.1 Objetivos

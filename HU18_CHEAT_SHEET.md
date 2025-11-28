@@ -1,5 +1,10 @@
 # 🚀 HU18 - Cheat Sheet de Referencia Rápida
 ## Seguimiento en Tiempo Real - Guía de Bolsillo
+### Mejoras implementadas sobre HU13 (Rutas Optimizadas)
+
+**Contexto**: HU18 extiende HU13 agregando tracking en tiempo real
+- **HU13**: Rutas optimizadas estáticas
+- **HU18**: Ubicación GPS en vivo con WebSockets
 
 ---
 

@@ -5,11 +5,27 @@
 
 ## 📊 Descripción General
 
-La **Historia de Usuario 18** implementa un sistema de seguimiento GPS en tiempo real que permite:
+La **Historia de Usuario 18** representa una **evolución y mejora** de **HU13 (Rutas Optimizadas)**, implementando un sistema de seguimiento GPS en tiempo real mediante WebSockets.
 
-- **Vendedores**: Compartir su ubicación en tiempo real mientras realizan visitas
-- **Tenderos**: Ver la ubicación actual de su vendedor asignado
-- **Administradores**: Monitorear todos los vendedores activos simultáneamente
+### Evolución desde HU13
+
+**HU13 (Base)** proporcionaba:
+- Rutas optimizadas estáticas con OpenRouteService
+- Cálculo de distancias y tiempos
+- Geometría de rutas para mapas
+
+**HU18 (Mejoras)** agrega:
+- **Tracking en tiempo real**: WebSockets para ubicación GPS continua
+- **Sistema de observadores**: Múltiples usuarios viendo en vivo
+- **Datos enriquecidos**: Velocidad, batería, timestamps
+- **Panel administrativo**: Monitoreo de toda la flota
+
+### Funcionalidades de HU18
+
+- **Vendedores**: Comparten su ubicación en tiempo real mientras ejecutan la ruta planificada (HU13)
+- **Tenderos**: Ven la ubicación actual de su vendedor asignado en un mapa interactivo
+- **Administradores**: Monitorean todos los vendedores activos simultáneamente
+- **Comparación**: Ruta planificada (HU13) vs. ruta real (HU18)
 
 ---
 
@@ -355,13 +371,20 @@ const ws = new WebSocket(`ws://api.com/tracking/ws/watch/1?token=${token}`);
 
 ## 📈 Roadmap Futuro
 
-### Fase 1 (Actual) ✅
-- [x] WebSocket básico para envío y recepción de ubicaciones GPS
+### Fase 0 (Completada) - HU13 ✅
+- [x] Rutas optimizadas con OpenRouteService
+- [x] Algoritmo TSP para orden de visitas
+- [x] Cálculo de distancias y tiempos
+- [x] Geometría de rutas para mapas
+
+### Fase 1 (Actual) - HU18 Mejoras ✅
+- [x] WebSocket para envío y recepción de ubicaciones GPS en tiempo real
 - [x] Gestión de conexiones en memoria con ConnectionManager
 - [x] Broadcast automático a múltiples observadores
 - [x] REST fallback endpoints para consultas HTTP
 - [x] Control de permisos por rol (ADMIN, VENDEDOR, TENDERO)
 - [x] Validación de coordenadas GPS
+- [x] Información adicional: velocidad y batería
 
 ### Fase 2 (Q1 2026)
 - [ ] Autenticación JWT en WebSockets

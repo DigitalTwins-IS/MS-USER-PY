@@ -7,6 +7,11 @@
 
 Se ha generado documentación técnica completa para el microservicio MS-USER-PY, con énfasis especial en la **Historia de Usuario 18 (HU18): Seguimiento en Tiempo Real de Vendedores**.
 
+**HU18 representa las mejoras implementadas sobre HU13 (Rutas Optimizadas)**:
+- HU13 proporciona rutas planificadas estáticas
+- HU18 agrega tracking en tiempo real con WebSockets
+- Juntas permiten comparar ruta planificada vs. ruta real
+
 **Fecha de generación**: Noviembre 28, 2025  
 **Versión**: 1.0.0  
 **Estado**: ✅ Completo y Listo para Publicación

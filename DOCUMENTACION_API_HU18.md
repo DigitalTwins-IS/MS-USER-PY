@@ -22,15 +22,30 @@
 
 **MS-USER-PY** es un microservicio de gestión de usuarios para el Sistema Digital Twins, desarrollado con FastAPI. Proporciona funcionalidades completas para la gestión de vendedores, tenderos, rutas optimizadas y **seguimiento en tiempo real** de ubicaciones GPS.
 
-### 1.2 Características Principales
+### 1.2 Evolución: De HU13 a HU18
 
-- ✅ **HU18**: **Seguimiento en tiempo real de vendedores con WebSockets**
-  - WebSocket para envío de ubicación GPS por vendedores
-  - WebSocket para observación en tiempo real por tenderos
-  - Panel administrativo para monitoreo de todos los vendedores
-  - APIs REST de fallback para consulta de ubicaciones
-  - Sistema de broadcast automático a observadores
-  - Gestión eficiente de conexiones con ConnectionManager
+**HU13 (Base)**: Rutas Optimizadas
+- Generación de rutas optimizadas con OpenRouteService
+- Algoritmo TSP (Traveling Salesman Problem)
+- Cálculo de distancias y tiempos estimados
+- Geometría de rutas para visualización en mapas
+
+**HU18 (Mejoras Implementadas)**: Seguimiento en Tiempo Real
+- ✅ **WebSocket para tracking en vivo** - Envío continuo de ubicación GPS
+- ✅ **Sistema de observadores** - Múltiples usuarios observando en tiempo real
+- ✅ **ConnectionManager** - Gestión eficiente de conexiones WebSocket
+- ✅ **Broadcast automático** - Notificación instantánea a todos los observadores
+- ✅ **APIs REST de fallback** - Alternativa HTTP para consultas
+- ✅ **Datos enriquecidos** - Velocidad, batería, timestamp
+
+### 1.3 Características Principales de HU18
+
+- ✅ **WebSocket Send Location**: Vendedores envían ubicación GPS cada 10 segundos
+- ✅ **WebSocket Watch**: Tenderos y admins observan vendedores en tiempo real
+- ✅ **Panel Administrativo**: Monitoreo de toda la flota simultáneamente
+- ✅ **REST Fallback**: APIs HTTP para consulta de ubicaciones
+- ✅ **In-Memory Storage**: Almacenamiento rápido sin latencia de BD
+- ✅ **Control de Permisos**: Validación por rol (ADMIN, VENDEDOR, TENDERO)
 
 ### 1.3 Tecnologías
 

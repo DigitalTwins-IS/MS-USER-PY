@@ -102,10 +102,20 @@ open http://localhost:8000/docs
 
 ### Descripción Breve
 
-Sistema de seguimiento GPS en tiempo real usando WebSockets que permite:
-- **Vendedores**: Enviar su ubicación cada 10 segundos
-- **Tenderos**: Ver la ubicación del vendedor en un mapa
-- **Administradores**: Monitorear todos los vendedores simultáneamente
+**HU18** representa una **mejora y evolución** de **HU13 (Rutas Optimizadas)**. Mientras HU13 proporciona rutas planificadas estáticas, HU18 agrega **seguimiento GPS en tiempo real** usando WebSockets.
+
+**Mejoras implementadas sobre HU13**:
+- **Tracking en tiempo real**: Ubicación GPS actualizada cada 10 segundos
+- **Sistema de observadores**: Múltiples usuarios observando en vivo
+- **WebSocket bidireccional**: Comunicación instantánea
+- **Panel administrativo**: Monitoreo de toda la flota
+- **Datos enriquecidos**: Velocidad, batería, timestamps
+
+**Funcionalidades**:
+- **Vendedores**: Envían su ubicación mientras ejecutan la ruta (HU13)
+- **Tenderos**: Ven la ubicación real del vendedor en mapa interactivo
+- **Administradores**: Monitorean todos los vendedores simultáneamente
+- **Comparación**: Ruta planificada (HU13) vs ruta real (HU18)
 
 ### Diagrama de Flujo
 

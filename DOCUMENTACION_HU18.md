@@ -9,11 +9,47 @@
 **Título**: Como tendero, quiero ver en tiempo real la ubicación del vendedor que viene a mi tienda  
 **Prioridad**: Alta  
 **Sprint**: Sprint 4  
-**Estado**: ✅ Completado
+**Estado**: ✅ Completado  
+**Basado en**: HU13 (Rutas Optimizadas) - Mejoras y extensiones
 
 ### Descripción
 
 Como tendero registrado en el sistema, quiero poder visualizar en un mapa la ubicación actual de mi vendedor asignado, para saber cuándo llegará a mi tienda y poder organizar mi tiempo de manera más eficiente.
+
+### Contexto y Evolución desde HU13
+
+Esta historia de usuario representa una **mejora significativa** implementada sobre **HU13 (Rutas Optimizadas)**. Mientras que HU13 permitía generar rutas optimizadas estáticas para vendedores, HU18 extiende esta funcionalidad agregando capacidades de **seguimiento en tiempo real** mediante WebSockets.
+
+**Mejoras implementadas sobre HU13**:
+
+1. **Tracking en Tiempo Real (Nuevo)**
+   - WebSocket para envío continuo de ubicación GPS
+   - Actualización automática cada 10 segundos
+   - Visualización en vivo en mapas interactivos
+
+2. **Sistema de Observadores (Nuevo)**
+   - Tenderos pueden ver su vendedor asignado en tiempo real
+   - Administradores pueden monitorear toda la flota
+   - Múltiples observadores por vendedor
+
+3. **Arquitectura Mejorada (Evolución)**
+   - ConnectionManager para gestión eficiente de WebSockets
+   - Almacenamiento in-memory de ubicaciones
+   - Sistema de broadcast automático
+
+4. **APIs de Fallback (Nuevo)**
+   - Endpoints REST para consultar última ubicación
+   - Alternativa HTTP cuando WebSocket no está disponible
+
+5. **Información Adicional (Nuevo)**
+   - Velocidad del vendedor en km/h
+   - Nivel de batería del dispositivo
+   - Timestamp de última actualización
+
+**Complementariedad con HU13**:
+- HU13 proporciona la ruta planificada optimizada
+- HU18 muestra la ubicación real durante la ejecución de la ruta
+- Juntas permiten comparar ruta planificada vs. ruta real
 
 ### Criterios de Aceptación
 
@@ -1354,9 +1390,12 @@ ws.onopen = () => {
 
 ### Documentación Relacionada
 
-- [Documentación API Completa](./DOCUMENTACION_API_HU18.md)
+- [Documentación API Completa HU18](./DOCUMENTACION_API_HU18.md)
 - [Resumen Ejecutivo HU18](./HU18_RESUMEN_EJECUTIVO.md)
 - [Cheat Sheet HU18](./HU18_CHEAT_SHEET.md)
+
+**Historia de Usuario Base**:
+- **HU13**: Rutas Optimizadas (funcionalidad base sobre la cual se construyó HU18)
 
 ### Recursos Externos
 
