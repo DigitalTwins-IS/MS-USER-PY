@@ -195,42 +195,6 @@ ws.onmessage = (event) => {
 
 ---
 
-## 📚 Otras Historias de Usuario Implementadas
-
-### HU2: Registro de Vendedores
-- Crear vendedor con asignación a zona
-- Actualizar datos de vendedor
-- Listar vendedores por zona
-
-### HU3: Registro de Tenderos
-- Crear tendero con coordenadas GPS
-- Validación de coordenadas dentro de Colombia
-- Geocodificación de direcciones
-
-### HU4: Actualización de Datos
-- Actualizar información de vendedores
-- Actualizar información de tenderos
-- Cambio de zona de vendedor
-
-### HU13: Rutas Optimizadas
-- Generación de rutas con OpenRouteService
-- Algoritmo TSP (Traveling Salesman Problem)
-- Cálculo de distancias y tiempos
-- Geometría de rutas para mapas
-
-### HU21: Agendamiento de Visitas
-- Agendar visitas basadas en inventario
-- Identificar tenderos con bajo stock
-- Calendario de visitas
-- Estados: pending, completed, cancelled
-
-### HU16: Registro de Incidencias
-- Registrar incidencias durante visitas
-- Tipos: ausencia, retraso, incumplimiento
-- Asociación con visitas
-
----
-
 ## 🏗️ Arquitectura del Sistema
 
 ### Microservicios

@@ -1354,10 +1354,9 @@ ws.onopen = () => {
 
 ### Documentación Relacionada
 
-- [HU13: Rutas Optimizadas](./HU13.md)
-- [HU2: Registro de Vendedores](./HU2.md)
-- [HU3: Registro de Tenderos](./HU3.md)
 - [Documentación API Completa](./DOCUMENTACION_API_HU18.md)
+- [Resumen Ejecutivo HU18](./HU18_RESUMEN_EJECUTIVO.md)
+- [Cheat Sheet HU18](./HU18_CHEAT_SHEET.md)
 
 ### Recursos Externos
 

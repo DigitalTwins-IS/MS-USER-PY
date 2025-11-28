@@ -356,22 +356,26 @@ const ws = new WebSocket(`ws://api.com/tracking/ws/watch/1?token=${token}`);
 ## 📈 Roadmap Futuro
 
 ### Fase 1 (Actual) ✅
-- [x] WebSocket básico para envío y recepción
-- [x] Gestión de conexiones en memoria
-- [x] Broadcast a múltiples observadores
-- [x] REST fallback endpoints
+- [x] WebSocket básico para envío y recepción de ubicaciones GPS
+- [x] Gestión de conexiones en memoria con ConnectionManager
+- [x] Broadcast automático a múltiples observadores
+- [x] REST fallback endpoints para consultas HTTP
+- [x] Control de permisos por rol (ADMIN, VENDEDOR, TENDERO)
+- [x] Validación de coordenadas GPS
 
 ### Fase 2 (Q1 2026)
-- [ ] Autenticación en WebSockets
-- [ ] Persistencia de trazas GPS
-- [ ] Historial de rutas
-- [ ] Notificaciones push cuando vendedor está cerca
+- [ ] Autenticación JWT en WebSockets
+- [ ] Persistencia de trazas GPS en PostgreSQL
+- [ ] Historial de rutas recorridas por vendedor
+- [ ] Notificaciones push cuando vendedor está cerca del tendero
+- [ ] Geofencing con alertas al entrar/salir de zonas
 
 ### Fase 3 (Q2 2026)
-- [ ] Predicción de tiempo de llegada con ML
-- [ ] Geofencing automático
-- [ ] Alertas de desvío de ruta
-- [ ] Dashboard de analytics
+- [ ] Predicción de tiempo de llegada con Machine Learning
+- [ ] Detección automática de desvíos de ruta planificada
+- [ ] Alertas inteligentes de retrasos
+- [ ] Dashboard de analytics con métricas históricas
+- [ ] Integración con Waze/Google Maps para ETA preciso
 
 ---
 

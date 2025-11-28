@@ -26,15 +26,12 @@ Se ha generado documentación técnica completa para el microservicio MS-USER-PY
   - Ejemplos de código en Python y JavaScript
   - Integración con React y React Native
   - Diagramas de flujo y arquitectura
-- ✅ APIs públicas de todos los módulos:
-  - Sellers (Vendedores) - HU2
-  - Shopkeepers (Tenderos) - HU3
-  - Assignments (Asignaciones)
-  - Routes (Rutas Optimizadas) - HU13
-  - Visits (Visitas) - HU21
-  - Inventory (Inventario)
-  - Seller Incidents (Incidencias) - HU16
-  - Geocoding (Geocodificación)
+- ✅ APIs de HU18 (Tracking en Tiempo Real):
+  - WebSocket: Enviar ubicación (Vendedor)
+  - WebSocket: Observar vendedor (Tendero/Admin)
+  - WebSocket: Observar todos (Admin)
+  - REST: Obtener última ubicación
+  - REST: Obtener todas las ubicaciones
 - ✅ Modelos de datos y schemas completos
 - ✅ Ejemplos de uso end-to-end
 - ✅ Guía de troubleshooting
